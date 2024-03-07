@@ -6,6 +6,7 @@ const User = mongoose.model(
     name: String,
     email: String,
     password: String,
+    roles: [],
     stripe_customer_token: String,
     members: [],
     payment_method: String,

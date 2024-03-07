@@ -1,9 +1,9 @@
 const Project = require('../models/project.model');
 const User = require('../models/user.model');
 
-const endpointSecret = "whsec_d54da89c8f21a6b014dbe85c17bd4fffbe9a9014924a9c2a696decea1d8d80cd";
+const endpointSecret = process.env.STRIPE_ENDPOINT;
 
-const stripe = require('stripe')('sk_test_51OjRdzGAOeZHGPfkMZtapIxg2mM49pmvLkY8HFEzpWBYAiJkmUlDXdzsBxqzeKqyrZHNuPFFzKKUv40SpdE0kkoi005Dwcg067');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 let paid_invoices = {}
 

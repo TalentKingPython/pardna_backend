@@ -7,7 +7,7 @@ exports.allAccess = (req, res) => {
 exports.getAllUnmembers = async (req, res) => {
   try {
     const user = await User.findById(req.userId);
-    const unmembers = await User.find({ '_id': { $nin: [...(user.members), user._id] } })
+    const unmembers = await User.find({ '_id': { $nin: [...(user.members), user._id] }, status: 'pass' })
     res.status(200).send({ data: unmembers })
   } catch (error) {
     res.status(500).send({ message: 'Unexpected Error' + error.toString() })

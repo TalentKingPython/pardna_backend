@@ -11,12 +11,9 @@ exports.signup = async (req, res) => {
   const user = new User({
     name: req.body.name,
     email: req.body.email,
+    status: 'review',
     password: bcrypt.hashSync(req.body.password, 8)
   });
-
-  const customer = await StripeControlloer.createCustomerProcess({ name: user.name, email: user.email });
-
-  user.stripe_customer_token = customer.id;
 
   user.save().then(result => {
 
@@ -49,9 +46,9 @@ exports.signin = async (req, res) => {
 
     if (!user) {
       return res.status(404).send({ message: "User Not found." });
-    }
-
-    if (!user.stripe_customer_token) {
+    } else if(user.status == 'review'){
+      return res.status(202).send({ message: "Your account is under review by Admin"})
+    } else if (!user.stripe_customer_token) {
       const customer = await StripeControlloer.createCustomerProcess({ name: user.name, email: user.email });
       user.stripe_customer_token = customer.id;
 
@@ -81,12 +78,13 @@ exports.signin = async (req, res) => {
       name: user.name,
       email: user.email,
       members: user.members,
+      roles: user.roles,
       stripe_customer_token: user.stripe_customer_token,
       payment_method: user.payment_method,
       authToken: token
     });
   } catch (err) {
-    res.status(500).send({ message: err.message || "Some error occurred while logging in." });
+    res.status(500).send({ message: err.message || "Unexpected error occurred while logging in." });
   };
 };
 
