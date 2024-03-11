@@ -13,9 +13,20 @@ exports.getAllProjects = async (req, res) => {
 };
 
 exports.addNewProject = async (req, res) => {
+  console.log(req.roles)
   try {
     const data = req.body;
     const creator_id = req.userId;
+
+    const creator_roles = req.roles;
+    if (creator_roles.includes('admin')) {
+    } else if (creator_roles.includes('tier2')) {
+      if (parseFloat(data.amount) > 50 || parseInt(data.number) > 20)
+        return res.status(403).send({ message: 'You don\'t have enough permission to create this project. Please reduce amount(50) and number of members(20).' })
+    } else if (creator_roles.includes('tier1')) {
+      if (parseFloat(data.amount) > 50 || parseInt(data.number) > 10)
+        return res.status(403).send({ message: 'You don\'t have enough permission to create this project. Please reduce amount(50) and number of members(10).' })
+    }
 
     const project = await Project({
       name: data.name,

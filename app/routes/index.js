@@ -10,7 +10,7 @@ const stripe_router = require('./stripe.routes');
 const router = express.Router();
 
 router.use('/auth', auth_router);
-router.use('/users', user_router);
+router.use('/user', user_router);
 router.use('/project', project_router);
 router.use('/stripe', stripe_router);
 

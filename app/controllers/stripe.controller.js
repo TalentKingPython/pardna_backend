@@ -175,7 +175,7 @@ exports.createProductAndPlanOnStripe = async (pardnaName, amount, duration) => {
     // Create a plan using the product
     const plan = await stripe.plans.create({
       nickname: pardnaName,
-      amount: amount,
+      amount: amount * 100,
       interval: duration,
       interval_count: 1,
       product: product.id,

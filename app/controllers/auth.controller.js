@@ -11,7 +11,6 @@ exports.signup = async (req, res) => {
   const user = new User({
     name: req.body.name,
     email: req.body.email,
-    status: 'review',
     password: bcrypt.hashSync(req.body.password, 8)
   });
 
@@ -46,7 +45,7 @@ exports.signin = async (req, res) => {
 
     if (!user) {
       return res.status(404).send({ message: "User Not found." });
-    } else if(user.status == 'review'){
+    } else if(!user.roles?.length){
       return res.status(202).send({ message: "Your account is under review by Admin"})
     } else if (!user.stripe_customer_token) {
       const customer = await StripeControlloer.createCustomerProcess({ name: user.name, email: user.email });
@@ -65,12 +64,12 @@ exports.signin = async (req, res) => {
     }
 
 
-    const token = jwt.sign({ id: user._id },
+    const token = jwt.sign({ id: user._id, roles: user.roles },
       config.secret,
       {
         algorithm: 'HS256',
         allowInsecureKeySizes: true,
-        expiresIn: 86400 // 24 hours
+        expiresIn: 86400
       });
 
     res.status(200).send({

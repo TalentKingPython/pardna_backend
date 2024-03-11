@@ -9,6 +9,7 @@ const User = mongoose.model(
     roles: [],
     stripe_customer_token: String,
     members: [],
+    status: String,
     payment_method: String,
   })
 );

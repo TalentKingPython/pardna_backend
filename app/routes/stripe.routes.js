@@ -28,8 +28,8 @@ router.post(
 );
 
 router.post(
-  '/create-subscriptions-',
-  controller.createSubscriptions
+  '/create-payout',
+  controller.createPayouts
 );
 
 module.exports = router;
