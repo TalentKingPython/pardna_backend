@@ -1,5 +1,7 @@
-const Project = require('../models/project.model');
-const User = require('../models/user.model');
+const db = require('../models')
+const Project = db.project;
+const User = db.user;
+const Award = db.award;
 
 const endpointSecret = process.env.STRIPE_ENDPOINT;
 
@@ -90,14 +92,6 @@ exports.handleStripeWebhook = async (req, res) => {
   res.send();
 }
 
-exports.createCustomerProcess = async (data) => {
-  let result = await stripe.customers.create({
-    name: data.name,
-    email: data.email,
-  });
-  return result;
-}
-
 exports.createNewCustomerOnStripe = async (req, res) => {
   try {
     let data = req.body;
@@ -137,7 +131,7 @@ exports.createPaymentIntentOnStripe = async (req, res) => {
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: 50,
-      currency: 'usd',
+      currency: 'cad',
       payment_method: paymentMethodId,
       customer: customerId,
     });
@@ -179,7 +173,7 @@ exports.createProductAndPlanOnStripe = async (pardnaName, amount, duration) => {
       interval: duration,
       interval_count: 1,
       product: product.id,
-      currency: 'USD'
+      currency: 'cad'
     });
 
     return plan;
@@ -216,42 +210,100 @@ exports.createSubscriptions = async (planId, endDate, activeMembers) => {
 
 
 exports.createPayouts = async (req, res) => {
-  const customerId = req.body.customerId;
+  try {
+    const customerId = req.body.customerId;
 
-  const customer = await stripe.customers.retrieve(customerId);
-  const defaultPaymentMethod = customer.invoice_settings.default_payment_method;
+    const customer = await stripe.customers.retrieve(customerId);
+    const defaultPaymentMethod = customer.invoice_settings.default_payment_method;
+    console.log(defaultPaymentMethod);
+    // const payout = await stripe.payouts.create({
+    //   amount: 1,
+    //   currency: 'cad',
+    //   method: 'standard',
+    //   destination: defaultPaymentMethod,
+    // });
+    // const payout = await stripe.paymentIntents.create({
+    //   amount: 50, 
+    //   currency: 'cad',
+    //   customer: customerId,
+    //   description: 'Example charge',
+    //   payment_method_types: ['card'], 
+    //   payment_method: defaultPaymentMethod,
+    //   confirm: true 
+    // });
 
-  const payout = await stripe.payouts.create({
-    amount: amount,
-    currency: 'usd',
-    method: 'standard',
-    destination: defaultPaymentMethod.id,
-  });
+    // console.log('Payout successful:', payout);
+    const payout = await stripe.balance.retrieve();
 
-  console.log('Payout successful:', payout);
-
-  res.status(200).send({ payout: payout });
+    res.status(200).send({ payout: payout });
+  } catch (error) {
+    console.log('Unexpected Error: ', error.toString())
+    res.status(500).send({ message: error.toString() })
+  }
 }
 
 exports.handlePaidInvoice = async () => {
-  await Promise.all(Object.keys(paid_invoices).map(async (planId) => {
-    let paid_customers = paid_invoices[planId];
-    const plan = await Project.findOne({ stripe_plan_token: planId });
-    const paid_members = plan.paid_members || {};
-    if (plan) {
-      Object.keys(paid_customers).map(item => {
-        paid_customers[item] = (paid_customers[item] || paid_members[item] || false);
-      })
-      if (Object.keys(paid_customers).length == parseInt(plan.number)) {
-        const keys = Object.keys(paid_customers).filter(key => paid_customers[key] == false);
-        // Choose a random key
-        const randomKey = keys[Math.floor(Math.random() * keys.length)];
-        // Set the chosen key to true
-        paid_customers[randomKey] = 'awarded';
+  try {
+    let award_data = []
+    await Promise.all(Object.keys(paid_invoices).map(async (planId) => {
+      let paid_customers = paid_invoices[planId];
+      const plan = await Project.findOne({ stripe_plan_token: planId });
+      const paid_members = plan.paid_members || {};
+      if (plan) {
+        Object.keys(paid_customers).map(item => {
+          paid_customers[item] = (paid_customers[item] || paid_members[item] || false);
+        })
+        if (Object.keys(paid_customers).length == parseInt(plan.number)) {
+          const keys = Object.keys(paid_customers).filter(key => paid_customers[key] == false);
+          // Choose a random key
+          const randomKey = keys[Math.floor(Math.random() * keys.length)];
+          // Set the chosen key to true
+          paid_customers[randomKey] = 'awarded';
+          award_data.push({ customerId: randomKey, projectId: plan['_id'], awardedAt: new Date() })
+        }
+
+        plan.paid_members = paid_customers;
+        await plan.save();
       }
-      plan.paid_members = paid_customers;
-      await plan.save();
+    }));
+    await Award.insertMany(award_data);
+    paid_invoices = {}
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+exports.payoutCronJob = async () => {
+  try {
+    const awardList = await Award.find({ paidAt: { $exists: false } });
+    const balance = await stripe.balance.retrieve();
+    if (awardList.length && balance) {
+      const project = await Project.find({ _id: awardList[0].projectId })
+      const awardAmount = parseFloat(project.amount) * 100 * parseInt(project.number)
+      const availableBalance = balance.available[0].amount
+      const pendingBalance = balance.pending[0].amount
+
+      if ((availableBalance > awardAmount) && awardList[0].customerId) {
+
+        const customer = await stripe.customers.retrieve(awardList[0].customerId);
+        const defaultPaymentMethod = customer.invoice_settings.default_payment_method;
+
+        const payout = await stripe.payouts.create({
+          amount: awardAmount,
+          currency: 'cad',
+          method: 'standard',
+          destination: defaultPaymentMethod,
+        });
+
+        console.log('Payout successful:', payout);
+        if (payout) {
+          awardList[0].payout = payout;
+          awardList[0].paidAt = new Date();
+          await awardList[0].save()
+        }
+      }
     }
-  }));
-  paid_invoices = {}
+  } catch (error) {
+    console.log(error);
+  }
 }

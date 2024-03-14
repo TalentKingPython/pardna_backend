@@ -13,7 +13,6 @@ exports.getAllProjects = async (req, res) => {
 };
 
 exports.addNewProject = async (req, res) => {
-  console.log(req.roles)
   try {
     const data = req.body;
     const creator_id = req.userId;
@@ -185,18 +184,19 @@ exports.cronAllProjects = async () => {
 
         await project.save();
       } else if (project.status === 'running') {
-        // const awarded_customers = Object.keys(project.paid_members).filter(key => project.paid_members[key] == 'awarded');
-        // Promise.all(awarded_customers.map(async (customerId) => {
-        //   const user = await User.findOne({ stripe_customer_token: customerId });
-        //   if (user) {
-        //     let awarded_projects = (user.awarded_projects || [])
-        //     if (!awarded_projects.includes(project['_id'])){
-        //       awarded_projects.push(project['_id']);
-        //     }
-        //     user.awarded_projects = awarded_projects;
-        //     await user.save();
-        //   }
-        // }))
+        const awarded_customers = Object.keys(project.paid_members).filter(key => project.paid_members[key] == 'awarded');
+        Promise.all(awarded_customers.map(async (customerId) => {
+          const user = await User.findOne({ stripe_customer_token: customerId });
+          if (user) {
+            let awarded_projects = (user.awarded_projects || [])
+            let awarded_data = []
+            if (!awarded_projects.includes(project['_id'])){
+              awarded_projects.push(project['_id']);
+            }
+            user.awarded_projects = awarded_projects;
+            await user.save();
+          }
+        }))
       }
     }));
   } catch (error) {
