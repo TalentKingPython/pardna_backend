@@ -92,6 +92,14 @@ exports.handleStripeWebhook = async (req, res) => {
   res.send();
 }
 
+exports.createCustomerProcess = async (data) => {
+  let result = await stripe.customers.create({
+    name: data.name,
+    email: data.email,
+  });
+  return result;
+}
+
 exports.createNewCustomerOnStripe = async (req, res) => {
   try {
     let data = req.body;
