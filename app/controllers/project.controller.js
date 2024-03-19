@@ -2,6 +2,7 @@ const db = require('../models');
 const Project = db.project;
 const User = db.user;
 const StripeController = require('./stripe.controller')
+const MailController = require('./mail.controller')
 
 exports.getAllProjects = async (req, res) => {
   try {
@@ -18,13 +19,17 @@ exports.addNewProject = async (req, res) => {
     const creator_id = req.userId;
 
     const creator_roles = req.roles;
+
+    if (parseFloat(data.amount) < 1 || parseInt(data.number) < 2)
+      return res.status(403).send({ message: 'Please set correct info! - amount(1.0+), number of members(5+)' })
+
     if (creator_roles.includes('admin')) {
     } else if (creator_roles.includes('tier2')) {
-      if (parseFloat(data.amount) > 50 || parseInt(data.number) > 20)
-        return res.status(403).send({ message: 'You don\'t have enough permission to create this project. Please reduce amount(50) and number of members(20).' })
+      if (parseFloat(data.amount) > 50 || (parseFloat(data.amount) * parseInt(data.number)) > 1000)
+        return res.status(403).send({ message: 'You don\'t have enough permission to create this project.' })
     } else if (creator_roles.includes('tier1')) {
-      if (parseFloat(data.amount) > 50 || parseInt(data.number) > 10)
-        return res.status(403).send({ message: 'You don\'t have enough permission to create this project. Please reduce amount(50) and number of members(10).' })
+      if (parseFloat(data.amount) > 50 || (parseFloat(data.amount) * parseInt(data.number)) > 500)
+        return res.status(403).send({ message: 'You don\'t have enough permission to create this project.' })
     }
 
     const project = await Project({
@@ -67,10 +72,13 @@ exports.addNewProjectMember = async (req, res) => {
     const activeMembers = project.members.filter(member => member['status'] === 'active');
     if (activeMembers.length >= parseInt(project.number))
       project.status = 'prepared'
+    
+    await MailController.projectCreationEmail(project.creator, member_id, project.duration, project.start)
 
     await project.save()
     res.status(200).send({ data: project });
   } catch (error) {
+    console.log(error);
     res.status(500).send({ message: 'Unexpected Error' + error.toString() })
   }
 }
@@ -130,6 +138,7 @@ exports.updateProjectMember = async (req, res) => {
       if (activeMembers.length >= parseInt(project.number))
         project.status = 'prepared'
       project.markModified('members');
+      await MailController.projectJoiningEmail(memberId, project.start, project.amount)
       await project.save();
       return res.status(200).send({ message: 'Update Project successfully!' });
     } else {
@@ -190,7 +199,7 @@ exports.cronAllProjects = async () => {
           if (user) {
             let awarded_projects = (user.awarded_projects || [])
             let awarded_data = []
-            if (!awarded_projects.includes(project['_id'])){
+            if (!awarded_projects.includes(project['_id'])) {
               awarded_projects.push(project['_id']);
             }
             user.awarded_projects = awarded_projects;

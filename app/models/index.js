@@ -9,6 +9,7 @@ db.mongoose = mongoose;
 db.user = require("./user.model");
 db.project = require("./project.model");
 db.award = require("./award.model");
+db.notification = require("./notification.model");
 
 db.mongoose
   .connect(`mongodb://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@${dbConfig.HOST}:${dbConfig.PORT}/${dbConfig.DB}`, {

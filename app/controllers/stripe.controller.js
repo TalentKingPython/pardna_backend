@@ -2,6 +2,7 @@ const db = require('../models')
 const Project = db.project;
 const User = db.user;
 const Award = db.award;
+const MailController = require('./mail.controller')
 
 const endpointSecret = process.env.STRIPE_ENDPOINT;
 
@@ -139,7 +140,7 @@ exports.createPaymentIntentOnStripe = async (req, res) => {
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: 50,
-      currency: 'cad',
+      currency: 'usd',
       payment_method: paymentMethodId,
       customer: customerId,
     });
@@ -181,7 +182,7 @@ exports.createProductAndPlanOnStripe = async (pardnaName, amount, duration) => {
       interval: duration,
       interval_count: 1,
       product: product.id,
-      currency: 'cad'
+      currency: 'usd'
     });
 
     return plan;
@@ -226,22 +227,22 @@ exports.createPayouts = async (req, res) => {
     console.log(defaultPaymentMethod);
     // const payout = await stripe.payouts.create({
     //   amount: 1,
-    //   currency: 'cad',
+    //   currency: 'usd',
     //   method: 'standard',
     //   destination: defaultPaymentMethod,
     // });
-    // const payout = await stripe.paymentIntents.create({
-    //   amount: 50, 
-    //   currency: 'cad',
-    //   customer: customerId,
-    //   description: 'Example charge',
-    //   payment_method_types: ['card'], 
-    //   payment_method: defaultPaymentMethod,
-    //   confirm: true 
-    // });
+    const payout = await stripe.paymentIntents.create({
+      amount: 5000, 
+      currency: 'usd',
+      customer: customerId,
+      description: 'Example charge',
+      payment_method_types: ['card'], 
+      payment_method: defaultPaymentMethod,
+      confirm: true 
+    });
 
     // console.log('Payout successful:', payout);
-    const payout = await stripe.balance.retrieve();
+    // const payout = await stripe.balance.retrieve();
 
     res.status(200).send({ payout: payout });
   } catch (error) {
@@ -267,6 +268,7 @@ exports.handlePaidInvoice = async () => {
           const randomKey = keys[Math.floor(Math.random() * keys.length)];
           // Set the chosen key to true
           paid_customers[randomKey] = 'awarded';
+          await MailController.projectAwardedEmail(randomKey, plan['_id'])
           award_data.push({ customerId: randomKey, projectId: plan['_id'], awardedAt: new Date() })
         }
 
@@ -287,7 +289,7 @@ exports.payoutCronJob = async () => {
     const balance = await stripe.balance.retrieve();
     if (awardList.length && balance) {
       const project = await Project.find({ _id: awardList[0].projectId })
-      const awardAmount = parseFloat(project.amount) * 100 * parseInt(project.number)
+      const awardAmount = parseFloat(project.amount) * 95 * parseInt(project.number)
       const availableBalance = balance.available[0].amount
       const pendingBalance = balance.pending[0].amount
 
@@ -298,7 +300,7 @@ exports.payoutCronJob = async () => {
 
         const payout = await stripe.payouts.create({
           amount: awardAmount,
-          currency: 'cad',
+          currency: 'usd',
           method: 'standard',
           destination: defaultPaymentMethod,
         });

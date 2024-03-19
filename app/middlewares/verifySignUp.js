@@ -1,12 +1,11 @@
 const db = require("../models");
-const ROLES = db.ROLES;
 const User = db.user;
 
 checkDuplicateEmail = (req, res, next) => {
   User.findOne({ email: req.body.email }).exec()
     .then(existingUser => {
       if (existingUser) {
-        return res.status(400).send({ message: "Failed! Email is already in use!" });
+        return res.status(400).send({ message: "You are not allowed to create multiple account using this email." });
       }
 
       next()
